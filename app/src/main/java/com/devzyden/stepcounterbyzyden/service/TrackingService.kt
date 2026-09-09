@@ -22,7 +22,6 @@ import com.devzyden.stepcounterbyzyden.engine.StepFilterEngine
 import com.google.android.gms.location.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import java.util.Locale
 
 class TrackingService : Service(), SensorEventListener {
 
@@ -61,22 +60,21 @@ class TrackingService : Service(), SensorEventListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val currentMonthlyTotal = prefs.fetchMonthlySteps()
 
-        // 💡 LIVE REFRESH TRIGGER: တကယ်လို့ Language ပြောင်းလို့ Intent လှမ်းပို့လိုက်တာဆိုရင် Notification ကို ချက်ချင်း အသစ်ပြန်ဆောက်မယ်
         if (intent?.action == "ACTION_REFRESH_LANGUAGE_LIVE") {
             updateNotification(lastStoredSessionSteps, currentMonthlyTotal)
             return START_STICKY
         }
 
+        // 💡 XIAOMI PERSISTENCE TRICK: Service ကို Foreground အဖြစ် ပြင်းပြင်းထန်ထန် သတ်မှတ်ထားခြင်း
         startForeground(NOTIFICATION_ID, buildNotification(lastStoredSessionSteps, currentMonthlyTotal))
         _isEngineActiveStream.value = true
 
         registerSensors()
         startLocationUpdates()
 
-        return START_STICKY
+        return START_STICKY // System က သတ်လျှင်တောင် OS က ချက်ချင်း ပြန်နှိုးပေးမည်
     }
 
-    // 💡 SYSTEM SETTING CHECKER: အကယ်လို့ User က ဖုန်း Setting ထဲကနေ App ဘာသာစကားကို လှမ်းချိန်းလိုက်ရင်လည်း ချက်ချင်း Notification ကို အလိုအလျောက် updates လုပ်ပေးခြင်း
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val currentMonthlyTotal = prefs.fetchMonthlySteps()
@@ -95,9 +93,13 @@ class TrackingService : Service(), SensorEventListener {
     }
 
     private fun startLocationUpdates() {
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 4000)
-            .setMinUpdateIntervalMillis(2000)
+        // 💡 ZERO BATTERY DRAIN: HIGH_ACCURACY စနစ်သုံးသော်လည်း Interval ကို အဆင်ပြေအောင် ညှိပြီး
+        // MaxWaitTime ကို ပါသုံးထားခြင်းက ဘက်ထရီ စားသုံးမှုကို သိသိသာသာ လျှော့ချပေးသည်
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+            .setMinUpdateIntervalMillis(3000)
+            .setMaxUpdateDelayMillis(10000) // Location updates များကို စုပြီးမှ ပို့ရန် (Battery Saver)
             .build()
+
         try {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         } catch (e: SecurityException) { }
@@ -126,6 +128,7 @@ class TrackingService : Service(), SensorEventListener {
             val currentTime = System.currentTimeMillis()
 
             if (deltaAddition > 0) {
+                // Anti-Cheat (G-Force) နှင့် Enhanced Vehicle Filter ကို ဖြတ်သန်းစစ်ဆေးခြင်း
                 if (filterEngine.verifyStepValidity(currentTime, currentX, currentY, currentZ) &&
                     filterEngine.verifyUserIsNotInVehicle(lastVerifiedLocation)) {
 

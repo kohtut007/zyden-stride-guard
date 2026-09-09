@@ -29,12 +29,43 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // UI စတင်ပွင့်ချိန်တွင် လက်ရှိရွေးချယ်ထားသော ဘာသာစကားအတိုင်း UI စာသားများကို သတ်မှတ်ပေးခြင်း
         refreshLocalizedStaticViews()
-
         evaluateSystemPermissions()
         attachReactiveStreamObservers()
         registerInterfaceListeners()
+
+        // 💡 XIAOMI BACKGROUND FIX: App စဖွင့်ချိန်တွင် ဖုန်းက Xiaomi/POCO/Redmi ဖြစ်နေပါက Dialog ပြခြင်း
+        if (Build.MANUFACTURER.lowercase(java.util.Locale.ROOT).contains("xiaomi")) {
+            showXiaomiPermissionDialog()
+        }
+    }
+
+    // 🎯 UX BEST PRACTICE: User အား Settings သွားပြင်ရန် လမ်းညွှန်မည့် လှပသော Dialog တစ်ခုတည်ဆောက်ခြင်း
+    private fun showXiaomiPermissionDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Xiaomi Optimization Setup")
+            .setMessage("Xiaomi China ROM များတွင် Background အလုပ်လုပ်ရန် 'Autostart' ခွင့်ပြုချက်ပေးရန်နှင့် Battery Saver တွင် 'No Restrictions' သို့ ပြောင်းလဲပေးရန် မဖြစ်မနေ လိုအပ်ပါသည်။")
+            .setCancelable(false) // User အလွယ်တကူ ကျော်မသွားနိုင်အောင် တားဆီးခြင်း
+            .setPositiveButton("1. Autostart ပြင်မည်") { dialog, _ ->
+                openXiaomiAutostartSettings() // ဤနေရာတွင် Function အား လှမ်းခေါ်ခြင်း
+                dialog.dismiss()
+
+                // Autostart ပြင်ပြီး ပြန်လာလျှင် ဒုတိယအဆင့် Battery ပြင်ဖို့ Dialog ထပ်နှိုးပေးခြင်း
+                showXiaomiBatterySaverDialog()
+            }
+            .show()
+    }
+
+    private fun showXiaomiBatterySaverDialog() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Xiaomi Optimization - Step 2")
+            .setMessage("နောက်ဆုံးအဆင့်အနေဖြင့် Battery Saver ကို 'No Restrictions' (ကန့်သတ်ချက်မရှိ) သို့ ပြောင်းလဲပေးပါဦး။")
+            .setCancelable(false)
+            .setPositiveButton("2. Battery Option ပြင်မည်") { dialog, _ ->
+                openXiaomiBatterySaverSettings() // ဤနေရာတွင် ဒုတိယ Function အား လှမ်းခေါ်ခြင်း
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun refreshLocalizedStaticViews() {
@@ -137,10 +168,51 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 💡 XIAOMI DEEP-LINK 1: Autostart Settings စာမျက်နှာကို တိုက်ရိုက်ပွင့်စေခြင်း
+    private fun openXiaomiAutostartSettings() {
+        try {
+            val intent = Intent().apply {
+                component = android.content.ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                )
+            }
+            startActivity(intent)
+            Toast.makeText(this, "Enable Autostart for StepCounter", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Xiaomi Autostart settings not found.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 💡 XIAOMI DEEP-LINK 2: App Battery Saver ကို "No Restrictions" စာမျက်နှာသို့ တိုက်ရိုက်ပို့ခြင်း
+    private fun openXiaomiBatterySaverSettings() {
+        try {
+            val intent = Intent().apply {
+                component = android.content.ComponentName(
+                    "com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.HiddenAppsContainerManagementActivity"
+                )
+            }
+            startActivity(intent)
+            Toast.makeText(this, "Set Battery Saver to 'No Restrictions'", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            // ဖုန်းအချို့တွင် Component ကွဲပြားလျှင် App Details Setting သို့ Fallback လုပ်ပေးခြင်း
+            val intent =
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.fromParts("package", packageName, null)
+                }
+            startActivity(intent)
+        }
+    }
+
     override fun onRequestPermissionsResult(code: Int, list: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, list, results)
         if (results.isNotEmpty() && results.any { it == PackageManager.PERMISSION_DENIED }) {
-            Toast.makeText(this, "Permissions required for reliable background tracking.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "Permissions required for reliable background tracking.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }

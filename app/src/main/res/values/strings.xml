@@ -7,5 +7,5 @@
 
     <!-- Notification Layout Formats -->
     <string name="noti_title">Step Tracker Active 🏃‍♂️</string>
-    <string name="noti_content">Monthly Total: %,d steps</string>
+    <string name="noti_content"><Monthly></Monthly> Total: %,d steps</string>
 </resources>
