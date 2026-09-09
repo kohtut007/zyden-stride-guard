@@ -19,7 +19,12 @@ import androidx.core.app.NotificationCompat
 import com.devzyden.stepcounterbyzyden.R
 import com.devzyden.stepcounterbyzyden.data.PreferenceManager
 import com.devzyden.stepcounterbyzyden.engine.StepFilterEngine
-import com.google.android.gms.location.*
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -62,11 +67,30 @@ class TrackingService : Service(), SensorEventListener {
 
         if (intent?.action == "ACTION_REFRESH_LANGUAGE_LIVE") {
             updateNotification(lastStoredSessionSteps, currentMonthlyTotal)
+            // Service သေသွားခဲ့လျှင် OS က ချက်ချင်းပြန်မနှိုးပေးနိုင်တဲ့ အခြေအနေမျိုး (ဥပမာ Deep Doze Mode) ရှိက
+            // AlarmManager ကို သုံးပြီး ၁၅ မိနစ်တစ်ခါ Service ကို အတင်းနောက်ကွယ်ကနေ Double-Check ပြန်နှိုးခိုင်းထားခြင်း
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+            val alarmIntent = Intent(this, TrackingService::class.java)
+            val pendingIntent = android.app.PendingIntent.getService(
+                this, 0, alarmIntent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            // ၁၅ မိနစ်တစ်ခါ ပုံမှန်နှိုးဆော်ရန် သတ်မှတ်ခြင်း
+            alarmManager.setInexactRepeating(
+                android.app.AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + (15 * 60 * 1000),
+                (15 * 60 * 1000).toLong(),
+                pendingIntent
+            )
+
             return START_STICKY
         }
 
         // 💡 XIAOMI PERSISTENCE TRICK: Service ကို Foreground အဖြစ် ပြင်းပြင်းထန်ထန် သတ်မှတ်ထားခြင်း
-        startForeground(NOTIFICATION_ID, buildNotification(lastStoredSessionSteps, currentMonthlyTotal))
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(lastStoredSessionSteps, currentMonthlyTotal)
+        )
         _isEngineActiveStream.value = true
 
         registerSensors()
@@ -101,8 +125,13 @@ class TrackingService : Service(), SensorEventListener {
             .build()
 
         try {
-            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
-        } catch (e: SecurityException) { }
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+        }
     }
 
     private val locationCallback = object : LocationCallback() {
@@ -130,7 +159,8 @@ class TrackingService : Service(), SensorEventListener {
             if (deltaAddition > 0) {
                 // Anti-Cheat (G-Force) နှင့် Enhanced Vehicle Filter ကို ဖြတ်သန်းစစ်ဆေးခြင်း
                 if (filterEngine.verifyStepValidity(currentTime, currentX, currentY, currentZ) &&
-                    filterEngine.verifyUserIsNotInVehicle(lastVerifiedLocation)) {
+                    filterEngine.verifyUserIsNotInVehicle(lastVerifiedLocation)
+                ) {
 
                     lastStoredSessionSteps = currentRawSteps
                     _sessionStepsStream.value = currentRawSteps
@@ -166,7 +196,11 @@ class TrackingService : Service(), SensorEventListener {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "Step Tracker Service", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Step Tracker Service",
+                NotificationManager.IMPORTANCE_LOW
+            )
             val manager = getSystemService(NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
         }
