@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">StepCounterByZyden</string>
+    <string name="app_title">Step Counter</string>
+    <string name="steps_label">STEPS</string>
+    <string name="btn_start">START TRACKING</string>
+    <string name="btn_stop">STOP TRACKING</string>
+
+    <!-- Notification Layout Formats -->
+    <string name="noti_title">Step Tracker Active 🏃‍♂️</string>
+    <string name="noti_content">Monthly Total: %,d steps</string>
+</resources>
