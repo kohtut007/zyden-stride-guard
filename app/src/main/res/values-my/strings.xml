@@ -8,4 +8,6 @@
     <!-- Notification Layout Formats -->
     <string name="noti_title">ခြေလှမ်းစနစ် အလုပ်လုပ်နေသည် 🏃‍♂️</string>
     <string name="noti_content">ယခုလစုစုပေါင်း: %,d လှမ်း</string>
+    <string name="distance_label">အကွာအဝေး (ကီလိုမီတာ)</string>
+    <string name="calories_label">ကယ်လိုရီ (kcal)</string>
 </resources>

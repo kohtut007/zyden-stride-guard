@@ -8,4 +8,6 @@
     <!-- Notification Layout Formats -->
     <string name="noti_title">Step Tracker Active 🏃‍♂️</string>
     <string name="noti_content"><Monthly></Monthly> Total: %,d steps</string>
+    <string name="distance_label">DISTANCE (KM)</string>
+    <string name="calories_label">CALORIES (KCAL)</string>
 </resources>

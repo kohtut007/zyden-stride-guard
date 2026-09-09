@@ -1,79 +1,145 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F9"
+    android:background="#F5F6FA"
     android:padding="24dp"
     tools:context=".MainActivity">
 
+    <!-- Screen Header Title -->
     <TextView
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
         android:text="Step Counter"
-        android:textColor="#1A1C1E"
-        android:textSize="24sp"
+        android:textColor="#000000"
+        android:textSize="22sp"
         android:textStyle="bold"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="32dp"/>
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Circular UI for Steps -->
+    <!-- Central Minimalist Step Counter Card (Circle) -->
     <androidx.cardview.widget.CardView
         android:id="@+id/cvStepsContainer"
-        android:layout_width="240dp"
-        android:layout_height="240dp"
-        app:cardCornerRadius="120dp"
-        app:cardElevation="8dp"
+        android:layout_width="220dp"
+        android:layout_height="220dp"
         app:cardBackgroundColor="#FFFFFF"
-        app:layout_constraintTop_toBottomOf="@id/tvTitle"
-        app:layout_constraintBottom_toTopOf="@id/btnToggleService"
+        app:cardCornerRadius="110dp"
+        app:cardElevation="4dp"
+        app:layout_constraintBottom_toTopOf="@id/tvDistanceDisplay"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/tvTitle"
+        app:layout_constraintVertical_bias="0.4">
 
-        <LinearLayout
+        <!-- Card Internal Elements inside ConstraintLayout for optimization -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:layout_height="match_parent">
 
             <TextView
                 android:id="@+id/tvStepDisplay"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="#70757A"
+                android:textColor="#5F6368"
                 android:textSize="64sp"
-                android:textStyle="bold"/>
+                android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintVertical_bias="0.45" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:letterSpacing="0.05"
                 android:text="STEPS"
-                android:textColor="#9AA0A6"
-                android:textSize="14sp"
+                android:textColor="#80868B"
+                android:textSize="12sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.1"/>
-        </LinearLayout>
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvStepDisplay" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
     </androidx.cardview.widget.CardView>
 
-    <Button
+    <!-- 💡 DISTANCE METRICS (No LinearLayout - Anchored with Constraints) -->
+    <TextView
+        android:id="@+id/tvDistanceDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:text="0.00"
+        android:textColor="#1A73E8"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/tvDistanceLabel"
+        app:layout_constraintEnd_toStartOf="@id/tvCaloriesDisplay"
+        app:layout_constraintHorizontal_chainStyle="spread"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/tvDistanceLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:text="DISTANCE (KM)"
+        android:textColor="#80868B"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/btnToggleService"
+        app:layout_constraintEnd_toEndOf="@id/tvDistanceDisplay"
+        app:layout_constraintStart_toStartOf="@id/tvDistanceDisplay" />
+
+    <!-- 💡 CALORIES METRICS (No LinearLayout - Anchored with Constraints) -->
+    <TextView
+        android:id="@+id/tvCaloriesDisplay"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:text="0"
+        android:textColor="#E37405"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/tvCaloriesLabel"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/tvDistanceDisplay" />
+
+    <TextView
+        android:id="@+id/tvCaloriesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:text="CALORIES (KCAL)"
+        android:textColor="#80868B"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/btnToggleService"
+        app:layout_constraintEnd_toEndOf="@id/tvCaloriesDisplay"
+        app:layout_constraintStart_toStartOf="@id/tvCaloriesDisplay" />
+
+    <!-- Bottom Action Pill Button -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btnToggleService"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="54dp"
+        android:layout_marginBottom="16dp"
         android:text="START TRACKING"
-        android:textSize="16sp"
-        android:textStyle="bold"
         android:textColor="#FFFFFF"
-        android:backgroundTint="#1A73E8"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:backgroundTint="#1A73E8"
+        app:cornerRadius="27dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="24dp"/>
+        app:layout_constraintStart_toStartOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

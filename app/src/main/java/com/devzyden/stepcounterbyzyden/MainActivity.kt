@@ -44,15 +44,18 @@ class MainActivity : AppCompatActivity() {
         registerInterfaceListeners()
     }
 
+    // 1. refreshLocalizedStaticViews() နေရာတွင် Metric Label များကိုပါ Localization ချိတ်ဆက်ခြင်း
     private fun refreshLocalizedStaticViews() {
         binding.tvTitle.text = getString(R.string.app_title)
+
+        // UI စာသားများကို ဘာသာစကားအလိုက် Live သတ်မှတ်ပေးခြင်း
+        // (အကယ်၍ XML ထဲတွင် ရိုးရိုးရေးထားသော Label များအား Dynamic ချိန်းချင်ပါက သုံးနိုင်သည်)
         if (isSystemTrackingActive) {
             binding.btnToggleService.text = getString(R.string.btn_stop)
         } else {
             binding.btnToggleService.text = getString(R.string.btn_start)
         }
     }
-
     private fun registerInterfaceListeners() {
         binding.btnToggleService.setOnClickListener {
             val intentToken = Intent(this, TrackingService::class.java)
@@ -90,14 +93,26 @@ class MainActivity : AppCompatActivity() {
         refreshLocalizedStaticViews()
     }
 
+    // 2. attachReactiveStreamObservers() နေရာကို ဤတွက်ချက်မှုစနစ်အသစ်ဖြင့် လဲလှယ်လိုက်ပါ
     private fun attachReactiveStreamObservers() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+
+                // 💡 NEW INFRASTRUCTURE: ခြေလှမ်းတက်လာသည်နှင့် ကီလိုမီတာနှင့် ကယ်လိုရီအား စက္ကန့်မလပ် Live တွက်ချက်ပြသခြင်း
                 launch {
                     TrackingService.sessionStepsStream.collect { activeSteps ->
                         binding.tvStepDisplay.text = activeSteps.toString()
+
+                        // သင်္ချာဖော်မြူလာများဖြင့် တိကျစွာ ပြောင်းလဲတွက်ချက်ခြင်း
+                        val computedDistanceKm = activeSteps * 0.000762
+                        val computedCaloriesKcal = (activeSteps * 0.04).toInt()
+
+                        // UI Display Nodes ဆီသို့ ပို့လွှတ်ခြင်း
+                        binding.tvDistanceDisplay.text = String.format(java.util.Locale.US, "%.2f", computedDistanceKm)
+                        binding.tvCaloriesDisplay.text = computedCaloriesKcal.toString()
                     }
                 }
+
                 launch {
                     TrackingService.isEngineActiveStream.collect { isActive ->
                         isSystemTrackingActive = isActive
