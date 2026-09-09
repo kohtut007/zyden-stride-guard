@@ -8,9 +8,12 @@ appcompat = "1.7.1"
 material = "1.14.0"
 activity = "1.13.0"
 constraintlayout = "2.2.2"
-
 playServicesLocation = "21.3.0"
 lifecycleKtx = "2.8.7"
+room = "2.6.1"
+ksp = "2.3.10"
+# WorkManager Version
+workRuntimeKtx = "2.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -21,10 +24,18 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-# Added for modern background flow processing and precise GPS speed detection
 google-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleKtx" }
 
+# Room DB Libraries
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# 💡 THE FIX: ဤစာကြောင်းသည် [libraries] အောက်တွင်သာ သေသေချာချာ တည်ရှိနေရပါမည် (plugins အောက်မှာ မဟုတ်ပါ)
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntimeKtx" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+google-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
