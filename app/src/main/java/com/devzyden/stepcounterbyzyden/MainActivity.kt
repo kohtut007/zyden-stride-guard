@@ -19,6 +19,8 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.devzyden.stepcounterbyzyden.data.StepRepository
+import com.devzyden.stepcounterbyzyden.data.local.DatabaseProvider
 import com.devzyden.stepcounterbyzyden.databinding.ActivityMainBinding
 import com.devzyden.stepcounterbyzyden.service.TrackingService
 import kotlinx.coroutines.launch
@@ -29,21 +31,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var isSystemTrackingActive = false
 
+    private lateinit var stepRepository: StepRepository
+
+    private val optimizationPreferences by lazy {
+        getSharedPreferences("zyden_app_preferences", MODE_PRIVATE)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val database = DatabaseProvider.getDatabase(applicationContext)
+        stepRepository = StepRepository(database.stepDao())
+
         refreshLocalizedStaticViews()
 
-        // 💡 ALL-DEVICE COMPATIBLE: Permissions နှင့် OEM Optimization များကို အဆင့်ဆင့်စစ်ဆေးခြင်း
         evaluateSystemPermissions()
         checkDeviceSpecificOptimizations()
 
         attachReactiveStreamObservers()
         registerInterfaceListeners()
     }
-
     // 1. refreshLocalizedStaticViews() နေရာတွင် Metric Label များကိုပါ Localization ချိတ်ဆက်ခြင်း
     private fun refreshLocalizedStaticViews() {
         binding.tvTitle.text = getString(R.string.app_title)
@@ -56,6 +66,7 @@ class MainActivity : AppCompatActivity() {
             binding.btnToggleService.text = getString(R.string.btn_start)
         }
     }
+
     private fun registerInterfaceListeners() {
         binding.btnToggleService.setOnClickListener {
             val intentToken = Intent(this, TrackingService::class.java)
@@ -100,16 +111,17 @@ class MainActivity : AppCompatActivity() {
 
                 // 💡 NEW INFRASTRUCTURE: ခြေလှမ်းတက်လာသည်နှင့် ကီလိုမီတာနှင့် ကယ်လိုရီအား စက္ကန့်မလပ် Live တွက်ချက်ပြသခြင်း
                 launch {
-                    TrackingService.sessionStepsStream.collect { activeSteps ->
+                    stepRepository.observeCurrentMonthSteps().collect { activeSteps ->
                         binding.tvStepDisplay.text = activeSteps.toString()
 
-                        // သင်္ချာဖော်မြူလာများဖြင့် တိကျစွာ ပြောင်းလဲတွက်ချက်ခြင်း
                         val computedDistanceKm = activeSteps * 0.000762
                         val computedCaloriesKcal = (activeSteps * 0.04).toInt()
 
-                        // UI Display Nodes ဆီသို့ ပို့လွှတ်ခြင်း
-                        binding.tvDistanceDisplay.text = String.format(java.util.Locale.US, "%.2f", computedDistanceKm)
-                        binding.tvCaloriesDisplay.text = computedCaloriesKcal.toString()
+                        binding.tvDistanceDisplay.text =
+                            String.format(java.util.Locale.US, "%.2f", computedDistanceKm)
+
+                        binding.tvCaloriesDisplay.text =
+                            computedCaloriesKcal.toString()
                     }
                 }
 
@@ -139,10 +151,20 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissionsNeeded.add(Manifest.permission.ACTIVITY_RECOGNITION)
         }
+        // 2. Location Tracking: ask only when neither precise nor approximate location is granted.
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-        // 2. Location Tracking (Vehicle motion အတွက် ဗားရှင်းအားလုံး လိုအပ်သည်)
-        permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (!hasFineLocation && !hasCoarseLocation) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
 
         // 3. Post Notifications (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -175,6 +197,10 @@ class MainActivity : AppCompatActivity() {
 
     // 💡 GLOBAL OEM OPTIMIZATION ENGINE: တရုတ်ဖုန်းလောကတစ်ခုလုံးကို လမ်းညွှန်ပေးမည့် စနစ်
     private fun checkDeviceSpecificOptimizations() {
+        if (optimizationPreferences.getBoolean("oem_optimization_setup_dismissed", false)) {
+            return
+        }
+
         val manufacturer = Build.MANUFACTURER.lowercase(Locale.ROOT)
 
         // OnePlus နှင့် Nothing တို့သည် Stock Android ဆန်သဖြင့် System Battery Optimization သို့ တိုက်ရိုက်လွှတ်နိုင်သည်
@@ -218,10 +244,18 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.Builder(this).setTitle("Step 2: Battery Optimization")
                     .setMessage("ဒုတိယအဆင့်အနေဖြင့် App အား Battery Unrestricted (ကန့်သတ်ချက်မရှိ) ပြောင်းလဲပေးပါ။")
                     .setPositiveButton("2. Fix Battery") { d2, _ ->
+                        optimizationPreferences.edit()
+                            .putBoolean("oem_optimization_setup_dismissed", true)
+                            .apply()
                         onStepTwo()
                         d2.dismiss()
                     }.show()
-            }.setNegativeButton("Ignore", null).show()
+            }.setNegativeButton("Ignore") { dialog, _ ->
+                optimizationPreferences.edit()
+                    .putBoolean("oem_optimization_setup_dismissed", true)
+                    .apply()
+                dialog.dismiss()
+            }.show()
     }
 
     // --- OEM Specific Hidden Components Intent Calls ---
