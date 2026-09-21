@@ -1,10 +1,10 @@
 package com.devzyden.stepcounterbyzyden
 
 import android.Manifest
+import android.content.res.ColorStateList
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +25,7 @@ import com.devzyden.stepcounterbyzyden.databinding.ActivityMainBinding
 import com.devzyden.stepcounterbyzyden.service.TrackingService
 import kotlinx.coroutines.launch
 import java.util.Locale
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -67,12 +68,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun hasRequiredTrackingPermissions(): Boolean {
+        val hasActivityRecognition =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACTIVITY_RECOGNITION
+                ) == PackageManager.PERMISSION_GRANTED
+
+        val hasLocation =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+
+        return hasActivityRecognition && hasLocation
+    }
+
     private fun registerInterfaceListeners() {
         binding.btnToggleService.setOnClickListener {
             val intentToken = Intent(this, TrackingService::class.java)
             if (isSystemTrackingActive) {
+                optimizationPreferences.edit()
+                    .putBoolean("tracking_enabled", false)
+                    .remove("tracking_session_id")
+                    .apply()
                 stopService(intentToken)
+            } else if (!hasRequiredTrackingPermissions()) {
+                evaluateSystemPermissions()
+                return@setOnClickListener
             } else {
+                val trackingSessionId = UUID.randomUUID().toString()
+                optimizationPreferences.edit()
+                    .putBoolean("tracking_enabled", true)
+                    .putString("tracking_session_id", trackingSessionId)
+                    .apply()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     startForegroundService(intentToken)
                 } else {
@@ -130,12 +164,10 @@ class MainActivity : AppCompatActivity() {
                         isSystemTrackingActive = isActive
                         if (isActive) {
                             binding.btnToggleService.text = getString(R.string.btn_stop)
-                            binding.btnToggleService.setBackgroundColor(Color.parseColor("#DC2626"))
-                            binding.tvStepDisplay.setTextColor(Color.parseColor("#16A34A"))
+                            binding.btnToggleService.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.status_stop))
                         } else {
                             binding.btnToggleService.text = getString(R.string.btn_start)
-                            binding.btnToggleService.setBackgroundColor(Color.parseColor("#2563EB"))
-                            binding.tvStepDisplay.setTextColor(Color.parseColor("#64748B"))
+                            binding.btnToggleService.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.button_primary))
                         }
                     }
                 }

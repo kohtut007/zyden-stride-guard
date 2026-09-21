@@ -2,6 +2,7 @@
     <string name="app_name">StepCounterByZyden</string>
     <string name="app_title">Step Counter</string>
     <string name="steps_label">STEPS</string>
+    <string name="steps_period_label">THIS MONTH</string>
     <string name="btn_start">START TRACKING</string>
     <string name="btn_stop">STOP TRACKING</string>
 

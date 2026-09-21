@@ -2,6 +2,7 @@
     <string name="app_name">StepCounterByZyden</string>
     <string name="app_title">ခြေလှမ်းရေတွက်စနစ်</string>
     <string name="steps_label">ခြေလှမ်းအရေအတွက်</string>
+    <string name="steps_period_label">ယခုလစုစုပေါင်း</string>
     <string name="btn_start">စတင်ရေတွက်မည်</string>
     <string name="btn_stop">ရပ်တန့်မည်</string>
 

@@ -2,6 +2,7 @@ package com.devzyden.stepcounterbyzyden.data
 
 import com.devzyden.stepcounterbyzyden.data.local.StepDao
 import com.devzyden.stepcounterbyzyden.data.local.StepEntity
+import com.devzyden.stepcounterbyzyden.data.local.TrackerStateEntity
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -16,6 +17,27 @@ class StepRepository(
 
         stepDao.addValidatedStepsAtomic(
             date = currentDateKey(), additionalSteps = additionalSteps
+        )
+    }
+
+    suspend fun getTrackingState(): TrackerStateEntity? {
+        return stepDao.getTrackingState()
+    }
+
+    suspend fun saveTrackingState(state: TrackerStateEntity) {
+        stepDao.upsertTrackingState(state)
+    }
+
+    suspend fun addValidatedStepsAndUpdateTrackingState(
+        additionalSteps: Int,
+        state: TrackerStateEntity
+    ) {
+        if (additionalSteps <= 0) return
+
+        stepDao.addValidatedStepsAndUpdateTrackingState(
+            date = currentDateKey(),
+            additionalSteps = additionalSteps,
+            state = state
         )
     }
 

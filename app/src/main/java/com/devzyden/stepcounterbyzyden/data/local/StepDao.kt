@@ -13,6 +13,13 @@ interface StepDao {
     @Query("SELECT * FROM daily_steps WHERE date = :date LIMIT 1")
     suspend fun getByDate(date: String): StepEntity?
 
+    @Query("SELECT * FROM tracker_state WHERE id = 1 LIMIT 1")
+    suspend fun getTrackingState(): TrackerStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTrackingState(state: TrackerStateEntity)
+
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertIfMissing(step: StepEntity): Long
 
@@ -42,6 +49,28 @@ interface StepDao {
             additionalSteps = additionalSteps
         )
     }
+
+    @Transaction
+    suspend fun addValidatedStepsAndUpdateTrackingState(
+        date: String,
+        additionalSteps: Int,
+        state: TrackerStateEntity
+    ) {
+        insertIfMissing(
+            StepEntity(
+                date = date,
+                validatedSteps = 0
+            )
+        )
+
+        incrementExisting(
+            date = date,
+            additionalSteps = additionalSteps
+        )
+
+        upsertTrackingState(state)
+    }
+
 
     @Query(
         """

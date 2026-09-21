@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.app.PendingIntent
 import android.content.res.Configuration
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -17,9 +18,11 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import com.devzyden.stepcounterbyzyden.MainActivity
 import com.devzyden.stepcounterbyzyden.R
 import com.devzyden.stepcounterbyzyden.data.StepRepository
 import com.devzyden.stepcounterbyzyden.data.local.DatabaseProvider
+import com.devzyden.stepcounterbyzyden.data.local.TrackerStateEntity
 import com.devzyden.stepcounterbyzyden.engine.StepFilterEngine
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -34,6 +37,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class TrackingService : Service(), SensorEventListener {
 
@@ -50,8 +56,16 @@ class TrackingService : Service(), SensorEventListener {
     )
 
     private var lastVerifiedLocation: Location? = null
+    private var trackingSessionId: String? = null
+
+    private var trackingStateReady = false
+
+    private var awaitingRestartBaseline = false
     private var initialSteps = -1
+    private var lastAcceptedSensorSteps = -1
     private var lastStoredSessionSteps = 0
+
+    private val trackingStateWriteMutex = Mutex()
 
     private var currentX = 0f
     private var currentY = 0f
@@ -120,12 +134,45 @@ class TrackingService : Service(), SensorEventListener {
             )
         }
 
-        _isEngineActiveStream.value = true
+        serviceScope.launch {
+            if (!initializeTrackingState()) return@launch
 
-        registerSensors()
-        startLocationUpdates()
+            withContext(Dispatchers.Main.immediate) {
+                _isEngineActiveStream.value = true
+                registerSensors()
+                startLocationUpdates()
+            }
+        }
 
         return START_STICKY
+    }
+
+    private suspend fun initializeTrackingState(): Boolean {
+        val preferences = getSharedPreferences("zyden_app_preferences", MODE_PRIVATE)
+        val sessionId = preferences.getString("tracking_session_id", null) ?: return false
+
+        trackingSessionId = sessionId
+
+        val savedState = stepRepository.getTrackingState()
+
+        if (savedState != null && savedState.sessionId == sessionId) {
+            initialSteps = savedState.baselineSensorSteps
+            lastAcceptedSensorSteps = savedState.lastAcceptedSensorSteps
+            lastStoredSessionSteps = savedState.sessionSteps
+            awaitingRestartBaseline = true
+        } else {
+            initialSteps = -1
+            lastAcceptedSensorSteps = -1
+            lastStoredSessionSteps = 0
+            awaitingRestartBaseline = false
+        }
+
+        val currentMonthlyTotal = stepRepository.getCurrentMonthSteps()
+        updateNotification(lastStoredSessionSteps, currentMonthlyTotal)
+
+        _sessionStepsStream.value = lastStoredSessionSteps
+        trackingStateReady = true
+        return true
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -203,23 +250,58 @@ class TrackingService : Service(), SensorEventListener {
 
         if (event.sensor.type == Sensor.TYPE_STEP_COUNTER) {
             val totalMasterSteps = event.values[0].toInt()
+            if (!trackingStateReady) return
 
-            if (
-                initialSteps == -1 ||
-                totalMasterSteps < lastStoredSessionSteps
-            ) {
-                initialSteps = totalMasterSteps
-                lastStoredSessionSteps = 0
+            if (awaitingRestartBaseline) {
+                lastAcceptedSensorSteps = totalMasterSteps
+                awaitingRestartBaseline = false
+
+                val sessionId = trackingSessionId ?: return
+                serviceScope.launch {
+                    trackingStateWriteMutex.withLock {
+                        stepRepository.saveTrackingState(
+                            TrackerStateEntity(
+                                sessionId = sessionId,
+                                baselineSensorSteps = initialSteps,
+                                lastAcceptedSensorSteps = totalMasterSteps,
+                                sessionSteps = lastStoredSessionSteps
+                            )
+                        )
+                    }
+                }
+                return
             }
 
-            val currentRawSteps =
-                totalMasterSteps - initialSteps
+            if (initialSteps == -1) {
+                initialSteps = totalMasterSteps
+                lastAcceptedSensorSteps = totalMasterSteps
+
+                val sessionId = trackingSessionId ?: return
+                serviceScope.launch {
+                    trackingStateWriteMutex.withLock {
+                        stepRepository.saveTrackingState(
+                            TrackerStateEntity(
+                                sessionId = sessionId,
+                                baselineSensorSteps = totalMasterSteps,
+                                lastAcceptedSensorSteps = totalMasterSteps,
+                                sessionSteps = 0
+                            )
+                        )
+                    }
+                }
+                return
+            }
+
+            if (totalMasterSteps < lastAcceptedSensorSteps) {
+                initialSteps = totalMasterSteps
+                lastAcceptedSensorSteps = totalMasterSteps
+                return
+            }
 
             val deltaAddition =
-                currentRawSteps - lastStoredSessionSteps
+                totalMasterSteps - lastAcceptedSensorSteps
 
             val currentTime = System.currentTimeMillis()
-
             if (deltaAddition > 0) {
                 val isValidStep =
                     filterEngine.verifyStepValidity(
@@ -242,26 +324,42 @@ class TrackingService : Service(), SensorEventListener {
                         // WakeLock is best-effort only.
                     }
 
-                    lastStoredSessionSteps = currentRawSteps
-                    _sessionStepsStream.value = currentRawSteps
+                    val sessionId = trackingSessionId ?: return
+                    val updatedSessionSteps =
+                        lastStoredSessionSteps + deltaAddition
+
+                    val updatedState = TrackerStateEntity(
+                        sessionId = sessionId,
+                        baselineSensorSteps = initialSteps,
+                        lastAcceptedSensorSteps = totalMasterSteps,
+                        sessionSteps = updatedSessionSteps
+                    )
+
+                    lastAcceptedSensorSteps = totalMasterSteps
+                    lastStoredSessionSteps = updatedSessionSteps
+                    _sessionStepsStream.value = updatedSessionSteps
 
                     serviceScope.launch {
-                        stepRepository.addValidatedSteps(
-                            deltaAddition
-                        )
+                        trackingStateWriteMutex.withLock {
+                            stepRepository.addValidatedStepsAndUpdateTrackingState(
+                                additionalSteps = deltaAddition,
+                                state = updatedState
+                            )
 
-                        val currentMonthlyTotal =
-                            stepRepository.getCurrentMonthSteps()
+                            val currentMonthlyTotal =
+                                stepRepository.getCurrentMonthSteps()
 
-                        updateNotification(
-                            lastStoredSessionSteps,
-                            currentMonthlyTotal
-                        )
+                            updateNotification(
+                                updatedSessionSteps,
+                                currentMonthlyTotal
+                            )
+                        }
                     }
                 }
             }
         }
     }
+
 
     override fun onAccuracyChanged(
         sensor: Sensor?,
@@ -283,6 +381,15 @@ class TrackingService : Service(), SensorEventListener {
                 monthlySteps
             )
 
+        val appIntent = Intent(this, MainActivity::class.java)
+        val contentPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            appIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+
         return NotificationCompat.Builder(
             this,
             CHANNEL_ID
@@ -291,6 +398,7 @@ class TrackingService : Service(), SensorEventListener {
                 getString(R.string.noti_title)
             )
             .setContentText(formattedContentText)
+            .setContentIntent(contentPendingIntent)
             .setSmallIcon(
                 android.R.drawable.ic_menu_compass
             )

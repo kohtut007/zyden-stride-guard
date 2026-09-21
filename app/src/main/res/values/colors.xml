@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
+    <color name="light_blue_background">#F4F9FD</color>
+    <color name="light_blue_surface">#FFFFFF</color>
+    <color name="light_blue_primary">#4A9FE8</color>
+    <color name="light_blue_primary_dark">#2378C9</color>
+    <color name="light_blue_border">#D9EAF7</color>
+    <color name="button_primary">#2F74AE</color>
+
+    <color name="text_primary">#111111</color>
+    <color name="text_secondary">#52606D</color>
+
+    <color name="status_stop">#DC4242</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
 </resources>

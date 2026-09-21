@@ -7,15 +7,35 @@ import android.os.Build
 import com.devzyden.stepcounterbyzyden.service.TrackingService
 
 class BootReceiver : BroadcastReceiver() {
+
     override fun onReceive(context: Context, intent: Intent) {
-        // ဖုန်း Reboot ကျသွားလျှင် ဖြစ်စေ၊ အခြား System event ဖြစ်စေ Service အား အလိုအလျောက် နောက်ကွယ်မှ ပြန်နှိုးခြင်း
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            val serviceIntent = Intent(context, TrackingService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
+        if (
+            intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
+            return
+        }
+
+        val preferences =
+            context.getSharedPreferences(
+                "zyden_app_preferences",
+                Context.MODE_PRIVATE
+            )
+
+        val trackingEnabled =
+            preferences.getBoolean("tracking_enabled", false)
+
+        if (!trackingEnabled) {
+            return
+        }
+
+        val serviceIntent =
+            Intent(context, TrackingService::class.java)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
         }
     }
 }
