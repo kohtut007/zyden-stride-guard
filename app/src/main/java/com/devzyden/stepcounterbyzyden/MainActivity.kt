@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         attachReactiveStreamObservers()
         registerInterfaceListeners()
+        recoverTrackingIfNeeded()
     }
     // 1. refreshLocalizedStaticViews() နေရာတွင် Metric Label များကိုပါ Localization ချိတ်ဆက်ခြင်း
     private fun refreshLocalizedStaticViews() {
@@ -65,6 +66,21 @@ class MainActivity : AppCompatActivity() {
             binding.btnToggleService.text = getString(R.string.btn_stop)
         } else {
             binding.btnToggleService.text = getString(R.string.btn_start)
+        }
+    }
+
+    private fun recoverTrackingIfNeeded() {
+        val trackingEnabled = optimizationPreferences.getBoolean("tracking_enabled", false)
+        if (!trackingEnabled) return
+
+        if (TrackingService.isEngineActiveStream.value || isSystemTrackingActive) return
+        if (!hasRequiredTrackingPermissions()) return
+
+        val intent = Intent(this, TrackingService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
     }
 
