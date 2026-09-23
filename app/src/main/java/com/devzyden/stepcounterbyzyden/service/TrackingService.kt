@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.app.PendingIntent
+import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -59,6 +60,7 @@ class TrackingService : Service(), SensorEventListener {
     private var trackingSessionId: String? = null
 
     private var trackingStateReady = false
+    private var locationSupportEnabled = false
 
     private var awaitingRestartBaseline = false
     private var initialSteps = -1
@@ -80,6 +82,7 @@ class TrackingService : Service(), SensorEventListener {
 
         private const val CHANNEL_ID = "step_counter_channel"
         private const val NOTIFICATION_ID = 101
+        const val ACTION_ENABLE_LOCATION_SUPPORT = "ACTION_ENABLE_LOCATION_SUPPORT"
     }
 
     override fun onCreate() {
@@ -116,14 +119,29 @@ class TrackingService : Service(), SensorEventListener {
             }
             return START_STICKY
         }
+        if (intent?.action == ACTION_ENABLE_LOCATION_SUPPORT) {
+            enableLocationSupportIfAvailable()
+            return START_STICKY
+        }
 
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(
-                lastStoredSessionSteps,
-                0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(
+                    lastStoredSessionSteps,
+                    0
+                ),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
             )
-        )
+        } else {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(
+                    lastStoredSessionSteps,
+                    0
+                )
+            )
+        }
 
         serviceScope.launch {
             val currentMonthlyTotal = stepRepository.getCurrentMonthSteps()
@@ -140,11 +158,67 @@ class TrackingService : Service(), SensorEventListener {
             withContext(Dispatchers.Main.immediate) {
                 _isEngineActiveStream.value = true
                 registerSensors()
-                startLocationUpdates()
             }
         }
 
         return START_STICKY
+    }
+
+    private fun enableLocationSupportIfAvailable() {
+        if (locationSupportEnabled) return
+        val hasFineLocation =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        val hasCoarseLocation =
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!hasFineLocation && !hasCoarseLocation) return
+
+        val locationManager =
+            getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+
+        val locationEnabled =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                locationManager.isLocationEnabled
+            } else {
+                locationManager.isProviderEnabled(
+                    android.location.LocationManager.GPS_PROVIDER
+                ) || locationManager.isProviderEnabled(
+                    android.location.LocationManager.NETWORK_PROVIDER
+                )
+            }
+
+        if (!locationEnabled) return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(
+                    lastStoredSessionSteps,
+                    0
+                ),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(
+                    lastStoredSessionSteps,
+                    0
+                ),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            )
+        }
+
+        startLocationUpdates()
+        locationSupportEnabled = true
     }
 
     private suspend fun initializeTrackingState(): Boolean {
@@ -367,7 +441,6 @@ class TrackingService : Service(), SensorEventListener {
     ) {
         // No-op.
     }
-
     private fun buildNotification(
         sessionSteps: Int,
         monthlySteps: Int

@@ -85,24 +85,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasRequiredTrackingPermissions(): Boolean {
-        val hasActivityRecognition =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACTIVITY_RECOGNITION
-                ) == PackageManager.PERMISSION_GRANTED
-
-        val hasLocation =
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-
-        return hasActivityRecognition && hasLocation
+                Manifest.permission.ACTIVITY_RECOGNITION
+            ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun registerInterfaceListeners() {
@@ -179,6 +166,15 @@ class MainActivity : AppCompatActivity() {
                     TrackingService.isEngineActiveStream.collect { isActive ->
                         isSystemTrackingActive = isActive
                         if (isActive) {
+                            val locationIntent = Intent(
+                                this@MainActivity,
+                                TrackingService::class.java
+                            ).apply {
+                                action = TrackingService.ACTION_ENABLE_LOCATION_SUPPORT
+                            }
+                            startService(locationIntent)
+                        }
+                        if (isActive) {
                             binding.btnToggleService.text = getString(R.string.btn_stop)
                             binding.btnToggleService.backgroundTintList = ColorStateList.valueOf(ContextCompat.getColor(this@MainActivity, R.color.status_stop))
                         } else {
@@ -199,25 +195,7 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissionsNeeded.add(Manifest.permission.ACTIVITY_RECOGNITION)
         }
-        // 2. Location Tracking: ask only when neither precise nor approximate location is granted.
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasCoarseLocation = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
 
-        if (!hasFineLocation && !hasCoarseLocation) {
-            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            permissionsNeeded.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
-
-        // 3. Post Notifications (Android 13+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsNeeded.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
 
         // မရရှိသေးသော ခွင့်ပြုချက်များကိုသာ စစ်ထုတ်ခြင်း
         val unauthorizedRequests = permissionsNeeded.filter {
